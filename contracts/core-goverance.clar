@@ -167,3 +167,44 @@
     (ok proposal-id)
   )
 )
+
+;; Vote on a Proposal
+(define-public (vote-on-proposal 
+  (proposal-id uint)
+  (vote-in-favor bool)
+)
+  (let 
+    (
+      (voter-tokens (get-member-token-balance tx-sender))
+      (proposal-data (unwrap! (get-proposal-details proposal-id) ERROR-PROPOSAL-NOT-FOUND))
+    )
+    
+    ;; Validate voting conditions
+    (asserts! (> voter-tokens u0) ERROR-NOT-AUTHORIZED)
+    (asserts! 
+      (and 
+        (<= (get voting-start-block proposal-data) block-height)
+        (>= (get voting-end-block proposal-data) block-height)
+      ) 
+      ERROR-INVALID-PROPOSAL-DATA
+    )
+    
+    ;; Update proposal votes
+    (if vote-in-favor
+      (map-set GovernanceProposals 
+        { proposal-id: proposal-id }
+        (merge proposal-data {
+          votes-in-favor: (+ (get votes-in-favor proposal-data) voter-tokens)
+        })
+      )
+      (map-set GovernanceProposals 
+        { proposal-id: proposal-id }
+        (merge proposal-data {
+          votes-against: (+ (get votes-against proposal-data) voter-tokens)
+        })
+      )
+    )
+    
+    (ok true)
+  )
+)
