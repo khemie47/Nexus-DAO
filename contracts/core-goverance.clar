@@ -208,3 +208,57 @@
     (ok true)
   )
 )
+
+;; Execute Proposal
+(define-public (execute-proposal (proposal-id uint))
+  (let 
+    (
+      (proposal-data (unwrap! (get-proposal-details proposal-id) ERROR-PROPOSAL-NOT-FOUND))
+      (total-votes-cast (+ (get votes-in-favor proposal-data) (get votes-against proposal-data)))
+    )
+    
+    ;; Validate proposal execution conditions
+    (asserts! 
+      (> block-height (get voting-end-block proposal-data)) 
+      ERROR-INVALID-PROPOSAL-DATA
+    )
+    
+    ;; Check if proposal passes quorum
+    (if 
+      (and 
+        (>= (get votes-in-favor proposal-data) (get quorum-requirement proposal-data))
+        (> (get votes-in-favor proposal-data) (get votes-against proposal-data))
+      )
+      (begin
+        ;; Update proposal status to Passed
+        (map-set GovernanceProposals 
+          { proposal-id: proposal-id }
+          (merge proposal-data { status: STATUS-PASSED })
+        )
+        
+        ;; Optional: Execute associated contract function
+        (match (get target-contract proposal-data)
+          contract-address 
+            (match (get executable-function proposal-data)
+              func-name (ok true)
+              (ok true)
+            )
+          (ok true)
+        )
+      )
+      ;; If proposal fails
+      (begin
+        (map-set GovernanceProposals 
+          { proposal-id: proposal-id }
+          (merge proposal-data { status: STATUS-REJECTED })
+        )
+        (ok false)
+      )
+    )
+  )
+)
+
+;; Authorization helper
+(define-private (is-admin (account-address principal))
+  (is-eq account-address CONTRACT-ADMIN)
+)
